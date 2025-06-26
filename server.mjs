@@ -1,9 +1,12 @@
 // server.mjs
 import express from "express";
 import fileUpload from "express-fileupload";
-import parseTorrent from "parse-torrent";
+//import parseTorrent from "parse-torrent";
 import WebTorrent from "webtorrent";
 import cors from "cors";
+import fetch from "node-fetch"; // Use node-fetch here
+import { Buffer } from "buffer";
+import parseTorrent, { toMagnetURI } from "parse-torrent";
 import fs from "fs";
 
 const app = express();
@@ -36,17 +39,31 @@ app.post("/upload", async (req, res) => {
 });
 
 app.get("/magnet", async (req, res) => {
-  const { torrent } = req.query;
-  if (!torrent) return res.status(400).send("Missing torrent URL");
+  const torrentUrl = req.query.torrent;
+  if (!torrentUrl) return res.status(400).send("Missing .torrent URL");
 
   try {
-    const response = await fetch(torrent);
-    const buffer = await response.arrayBuffer();
-    const parsed = parseTorrent(Buffer.from(buffer));
+    const response = await fetch(torrentUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        Accept: "*/*",
+      },
+    });
+
+    if (!response.ok) {
+      console.error("Failed to fetch:", response.statusText);
+      return res.status(500).send("Failed to fetch torrent");
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    const parsed = await parseTorrent(buffer); // ✅ AWAIT IT!
+    console.log("🔍 Parsed Torrent:", parsed);
+
     const magnet = toMagnetURI(parsed);
     res.json({ magnet });
-  } catch (error) {
-    console.error("❌ Magnet conversion failed:", error);
+  } catch (err) {
+    console.error("❌ Error converting:", err);
     res.status(500).send("Failed to convert torrent to magnet");
   }
 });
@@ -57,7 +74,11 @@ app.get("/yts", async (req, res) => {
   if (!title) return res.status(400).send("Missing title");
 
   try {
-    const ytsRes = await fetch(`https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(title)}`);
+    const ytsRes = await fetch(
+      `https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(
+        title
+      )}`
+    );
     const json = await ytsRes.json();
     res.json(json);
   } catch (err) {
@@ -65,7 +86,6 @@ app.get("/yts", async (req, res) => {
     res.status(500).send("Failed to fetch from YTS");
   }
 });
-
 
 // Stream endpoint
 app.get("/stream", (req, res) => {
