@@ -35,6 +35,22 @@ app.post("/upload", async (req, res) => {
   }
 });
 
+app.get("/yts", async (req, res) => {
+  const title = req.query.title;
+
+  if (!title) return res.status(400).send("Missing title");
+
+  try {
+    const ytsRes = await fetch(`https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(title)}`);
+    const json = await ytsRes.json();
+    res.json(json);
+  } catch (err) {
+    console.error("YTS proxy error:", err);
+    res.status(500).send("Failed to fetch from YTS");
+  }
+});
+
+
 // Stream endpoint
 app.get("/stream", (req, res) => {
   const magnetURI = req.query.magnet;
