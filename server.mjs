@@ -35,6 +35,22 @@ app.post("/upload", async (req, res) => {
   }
 });
 
+app.get("/magnet", async (req, res) => {
+  const { torrent } = req.query;
+  if (!torrent) return res.status(400).send("Missing torrent URL");
+
+  try {
+    const response = await fetch(torrent);
+    const buffer = await response.arrayBuffer();
+    const parsed = parseTorrent(Buffer.from(buffer));
+    const magnet = toMagnetURI(parsed);
+    res.json({ magnet });
+  } catch (error) {
+    console.error("❌ Magnet conversion failed:", error);
+    res.status(500).send("Failed to convert torrent to magnet");
+  }
+});
+
 app.get("/yts", async (req, res) => {
   const title = req.query.title;
 
